@@ -11,6 +11,7 @@ contents:
     - go-1.19
     - openssh
     - wolfi-baselayout
+    - golangci-lint
 
 accounts:
   groups:
