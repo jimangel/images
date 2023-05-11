@@ -146,16 +146,16 @@ runs:
       id: apko
       shell: bash
       env:
+        TF_VAR_apko_config_path: ${{ inputs.apkoConfig }}
         TF_VAR_target_repository: ${{ inputs.apkoBaseTag }}
       run: |
         set -x
-        # TODO: allow terraform-provider-apko to point
-        # to alt file besides "apko.yaml"
-        cp "${{ inputs.apkoConfig }}" apko.yaml
         terraform init
         terraform apply -auto-approve
         tree || true
         ls -lath || true
+        digest="$(terraform output --raw image_ref)"
+        echo "digest: ${digest}"
 
     # # Build and push
     # - id: apko
