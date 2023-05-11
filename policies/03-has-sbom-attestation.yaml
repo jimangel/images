@@ -4,7 +4,7 @@ metadata:
   name: has-sbom-attestation
 spec:
   images:
-    - glob: cgr.dev/chainguard/*
+    - glob: ghcr.io/chainguard-images/testing/release-2.0/*
   authorities:
     - name: keyless-authority
       keyless:
