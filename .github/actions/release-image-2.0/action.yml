@@ -135,6 +135,26 @@ runs:
         yq -M '{"options": .}' tmp.yaml >> "${{ inputs.apkoConfig }}"
         rm -f tmp.yaml
 
+    # Create docker config for use by rumble
+    - id: rumble-docker-config
+      shell: bash
+      run: |
+        REGISTRY_HOSTNAME="$(echo ${{ inputs.apkoBaseTag }} | cut -d / -f 1)"
+        export DOCKER_CONFIG="${PWD}/.docker-rumble"
+        mkdir -p "${DOCKER_CONFIG}"
+        echo '{}' > "${DOCKER_CONFIG}/config.json"
+        if [[ "${REGISTRY_HOSTNAME}" == "cgr.dev" ]]; then
+          CRED_HELPER_GET_RESPONSE="$(echo "cgr.dev" | docker-credential-cgr get)"
+          echo "$(echo "${CRED_HELPER_GET_RESPONSE}" | jq -r .Secret)" | \
+            cosign login -u "$(echo "${CRED_HELPER_GET_RESPONSE}" | jq -r .Username)" --password-stdin "cgr.dev"
+        elif [[ "${REGISTRY_HOSTNAME}" == *"gcr.io" || "${REGISTRY_HOSTNAME}" == *"pkg.dev" ]]; then
+          gcloud auth print-access-token | \
+            docker login -u oauth2accesstoken --password-stdin "https://${REGISTRY_HOSTNAME}"
+        else
+          echo "${{ github.token }}" | \
+            docker login -u "${{ github.repository_owner }}" --password-stdin "https://ghcr.io"
+        fi
+
     - name: Setup Terrafrom
       id: setup-terraform
       uses: hashicorp/setup-terraform@v2
@@ -148,14 +168,16 @@ runs:
       env:
         TF_VAR_apko_config_path: ${{ inputs.apkoConfig }}
         TF_VAR_target_repository: ${{ inputs.apkoBaseTag }}
+        DOCKER_CONFIG: .docker-rumble
       run: |
         set -x
         terraform init
         terraform apply -auto-approve
         tree || true
         ls -lath || true
-        digest="$(terraform output --raw image_ref)"
-        echo "digest: ${digest}"
+        digest_index="$(terraform output --raw image_ref)"
+        echo "index digest: ${digest_index}"
+        echo "digest-index=${digest_index}" >> $GITHUB_OUTPUT
 
     # # Build and push
     # - id: apko
@@ -189,26 +211,6 @@ runs:
         export IMAGE_TAG_SUFFIX="${{ inputs.apkoTargetTagSuffix }}"
         cd "${{ inputs.testCommandDir }}"
         ${{ inputs.testCommandExe }}
-
-    # Create docker config for use by rumble
-    - id: rumble-docker-config
-      shell: bash
-      run: |
-        REGISTRY_HOSTNAME="$(echo ${{ inputs.apkoBaseTag }} | cut -d / -f 1)"
-        export DOCKER_CONFIG="${PWD}/.docker-rumble"
-        mkdir -p "${DOCKER_CONFIG}"
-        echo '{}' > "${DOCKER_CONFIG}/config.json"
-        if [[ "${REGISTRY_HOSTNAME}" == "cgr.dev" ]]; then
-          CRED_HELPER_GET_RESPONSE="$(echo "cgr.dev" | docker-credential-cgr get)"
-          echo "$(echo "${CRED_HELPER_GET_RESPONSE}" | jq -r .Secret)" | \
-            cosign login -u "$(echo "${CRED_HELPER_GET_RESPONSE}" | jq -r .Username)" --password-stdin "cgr.dev"
-        elif [[ "${REGISTRY_HOSTNAME}" == *"gcr.io" || "${REGISTRY_HOSTNAME}" == *"pkg.dev" ]]; then
-          gcloud auth print-access-token | \
-            docker login -u oauth2accesstoken --password-stdin "https://${REGISTRY_HOSTNAME}"
-        else
-          echo "${{ github.token }}" | \
-            docker login -u "${{ github.repository_owner }}" --password-stdin "https://ghcr.io"
-        fi
 
     # Scan - first index, then amd64, then arm64, then others
     # TODO: improve this - make a single action that runs multiple, or run in matrix at top level
