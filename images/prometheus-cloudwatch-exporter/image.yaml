@@ -1,9 +1,0 @@
-versions:
-  - apko:
-      config: configs/latest.apko.yaml
-      extractTagsFrom:
-        package: cloudwatch-exporter
-      subvariants:
-        - suffix: -dev
-          options:
-            - dev

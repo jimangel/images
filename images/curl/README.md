@@ -3,7 +3,7 @@
 | | |
 | - | - |
 | **Status** | stable |
-| **OCI Reference** | `cgr.dev/chainguard/curl` |
+| **OCI Reference** | `ghcr.io/chainguard-images/testing/release-2.0/curl` |
 | **Variants/Tags** | ![](https://storage.googleapis.com/chainguard-images-build-outputs/summary/curl.svg) |
 
 *[Contact Chainguard](https://www.chainguard.dev/chainguard-images) for enterprise support, SLAs, and access to older tags.*

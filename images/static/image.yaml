@@ -1,6 +1,0 @@
-excludeContact: true
-versions:
-  - apko:
-      config: configs/latest.apko.yaml
-  - apko:
-      config: configs/latest-glibc.apko.yaml
