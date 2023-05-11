@@ -135,26 +135,47 @@ runs:
         yq -M '{"options": .}' tmp.yaml >> "${{ inputs.apkoConfig }}"
         rm -f tmp.yaml
 
-    # Build and push
-    - id: apko
-      uses: chainguard-images/actions/apko-snapshot@main
+    - name: Setup Terrafrom
+      id: setup-terraform
+      uses: hashicorp/setup-terraform@v2
       with:
-        apko-image: ${{ inputs.apkoImage }}
-        config: ${{ inputs.apkoConfig }}
-        base-tag: ${{ inputs.apkoBaseTag }}
-        target-tag: ${{ inputs.apkoTargetTag }}
-        keyring-append: ${{ inputs.apkoKeyringAppend }}
-        repository-append: ${{ inputs.apkoRepositoryAppend }}
-        additional-tags: ${{ inputs.apkoAdditionalTags }}
-        package-version-tag: ${{ inputs.apkoPackageVersionTag }}
-        package-version-tag-stem: true
-        package-version-tag-prefix: ${{ inputs.apkoPackageVersionTagPrefix }}
-        stage_tags: apko.tags
-        build-options: ${{ inputs.apkoBuildOptions }}
-        sbom-attest: true
-        slsa-attest: true
-        generic-user: ${{ steps.cgrauth2.outputs.username }}
-        generic-pass: ${{ steps.cgrauth2.outputs.password }}
+        terraform_version: '1.3.*'
+        terraform_wrapper: false
+
+    - name: Terraform apply (apko publish)
+      id: apko
+      env:
+        TF_VAR_target_repository: ${{ inputs.apkoBaseTag }}
+      run: |
+        set -x
+        # TODO: allow terraform-provider-apko to point
+        # to alt file besides "apko.yaml"
+        cp "${{ inputs.apkoConfig }}" apko.yaml
+        terraform init
+        terraform apply -auto-approve
+        tree || true
+        ls -lath || true
+
+    # # Build and push
+    # - id: apko
+    #   uses: chainguard-images/actions/apko-snapshot@main
+    #   with:
+    #     apko-image: ${{ inputs.apkoImage }}
+    #     config: ${{ inputs.apkoConfig }}
+    #     base-tag: ${{ inputs.apkoBaseTag }}
+    #     target-tag: ${{ inputs.apkoTargetTag }}
+    #     keyring-append: ${{ inputs.apkoKeyringAppend }}
+    #     repository-append: ${{ inputs.apkoRepositoryAppend }}
+    #     additional-tags: ${{ inputs.apkoAdditionalTags }}
+    #     package-version-tag: ${{ inputs.apkoPackageVersionTag }}
+    #     package-version-tag-stem: true
+    #     package-version-tag-prefix: ${{ inputs.apkoPackageVersionTagPrefix }}
+    #     stage_tags: apko.tags
+    #     build-options: ${{ inputs.apkoBuildOptions }}
+    #     sbom-attest: true
+    #     slsa-attest: true
+    #     generic-user: ${{ steps.cgrauth2.outputs.username }}
+    #     generic-pass: ${{ steps.cgrauth2.outputs.password }}
 
     # Test image
     - name: Smoke test
