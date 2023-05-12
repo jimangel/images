@@ -135,6 +135,11 @@ runs:
         yq -M '{"options": .}' tmp.yaml >> "${{ inputs.apkoConfig }}"
         rm -f tmp.yaml
 
+    # Needed in step below to login to registry
+    - name: Setup cosign
+      if: contains(inputs.apkoBaseTag, 'cgr.dev/') && inputs.chainguardIdentity != ''
+      uses: sigstore/cosign-installer@v3
+
     # Create docker config for use by rumble
     - id: rumble-docker-config
       shell: bash
@@ -155,8 +160,6 @@ runs:
             docker login -u "${{ github.repository_owner }}" --password-stdin "https://ghcr.io"
         fi
 
-    - uses: imjasonh/setup-crane@v0.3
-
     - name: Setup Terrafrom
       id: setup-terraform
       uses: hashicorp/setup-terraform@v2
@@ -165,7 +168,7 @@ runs:
         terraform_wrapper: false
 
     - name: Terraform apply (apko publish)
-      id: apko
+      id: terraform-apply
       shell: bash
       env:
         TF_VAR_apko_config_path: ${{ inputs.apkoConfig }}
@@ -176,9 +179,19 @@ runs:
         set -x
         terraform init
         terraform apply -auto-approve
-        
-        package_version="$(terraform output --json package_version)"
-        echo "Package version: ${package_version}"
+
+    # Needed in step below to process arch-specific manifest digests etc.
+    - name: Setup crane
+      id: setup-crane
+      uses: imjasonh/setup-crane@v0.3
+
+    - name: Process Terraform outputs
+      id: apko
+      shell: bash
+      env:
+        DOCKER_CONFIG: .docker-rumble
+      run: |
+        set -x
 
         # Extra stuff related to output etc. used in remainder of pipeline
         digest="$(terraform output --raw image_ref)"
@@ -204,9 +217,28 @@ runs:
           done
         fi
 
-        # TODO: add more tags based on package extract here
+    # The apko.tags file is needed in tagging below after all attestations and tests pass etc.
+    - name: Create apko.tags file
+      id: create-apko-tags
+      shell: bash
+      env:
+        DOCKER_CONFIG: .docker-rumble
+      run: |
+        set -x
+
+        # Add the primary tag (e.g. "latest") and the timestamped tag (e.g. "latest-20230512")
         echo "${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}" > apko.tags
-        echo "${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}-$(date -u +%Y%m%d)" > apko.tags
+        echo "${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}-$(date -u +%Y%m%d)" >> apko.tags
+
+        package_version_json="$(terraform output --json package_version)"
+        echo "Package version JSON: ${package_version_json}"
+        for v in $(echo "${package_version_json}" | jq -r '.[]'); do
+          tag="${v}${{ inputs.apkoTargetTagSuffix }}"
+          echo "${{ inputs.apkoBaseTag }}:${tag}" >> apko.tags
+        done
+
+        echo "Contents of apko.tags:"
+        cat apko.tags
 
     # # Build and push
     # - id: apko
@@ -386,11 +418,6 @@ runs:
             fi
           done
           if [[ "${skip}" == "0" ]]; then
-            # Do not add suffix to target tag or target tag + date
-            # (these aleady have suffix, e.g. "1.19-dev" or "1.19-dev-20230315")
-            if ! [[ "${tag}" == "${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}" || "${tag}" =~ ^"${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}"-[0-9]{8}$ ]]; then
-              tag="${tag}${{ inputs.apkoTargetTagSuffix }}"
-            fi
             crane cp "${REF}" "${tag}"
             # Mirror image to alternate destination
             if [[ "${{ inputs.mirror }}" != "" ]]; then
