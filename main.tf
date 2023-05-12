@@ -25,6 +25,10 @@ variable "target_repository" {
   description = "The docker repo into which the image and attestations should be published."
 }
 
+variable "extract_package" {
+  description = "TODO."
+}
+
 provider "apko" {
   extra_repositories = []
   extra_keyring      = []
@@ -41,4 +45,10 @@ module "image" {
 
 output "image_ref" {
   value = module.image.image_ref
+}
+
+output "package_version" {
+  value = [
+    for x in module.image.config.contents.packages : regexall("(((([a-z0-9]+)(?:[.][a-z0-9]+)?)(?:[.][a-z0-9]+)?)(?:[-][a-z0-9]+)?)", trimprefix(x, "${var.extract_package}=")) if startswith(x, "${var.extract_package}=")
+  ][0][0]
 }
