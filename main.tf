@@ -28,7 +28,8 @@ variable "target_repository" {
 provider "apko" {
   extra_repositories = []
   extra_keyring      = []
-  default_archs      = []
+  # TODO: why is this needed?
+  default_archs      = ["amd64", "aarch64"]
   extra_packages     = []
 }
 
