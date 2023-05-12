@@ -66,6 +66,7 @@ jobs:
       actions: read
     steps:
       - name: Generate SLSA provenance
+        id: generate-slsa-provenance
         env:
           COSIGN_EXPERIMENTAL: "true"
           GENERATOR_REPOSITORY: slsa-framework/slsa-github-generator
@@ -93,6 +94,7 @@ jobs:
           cat provenance.json | jq
 
           # Add base64 version of it to outputs
+          set +x
           echo "slsa-provenance-base64=$(cat provenance.json | base64 -w 0)" >> $GITHUB_OUTPUT
 
   build:
