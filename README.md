@@ -2,4 +2,4 @@
 
 | Name | OCI Reference | Status | Variants/Tags |
 | ----- | ----- | ----- |  -------- |
-| [wolfi-base](./images/wolfi-base) | `ghcr.io/chainguard-images/testing/release-2.0/wolfi-base` | stable | [![](https://storage.googleapis.com/chainguard-images-build-outputs/badges/wolfi-base.build.status.latest.svg)](images/wolfi-base/configs/latest.apko.yaml) |
+| [wolfi-base](./images/wolfi-base) | `ghcr.io/chainguard-images/testing/release-2.0/wolfi-base` | stable | [![](https://storage.googleapis.com/chainguard-images-build-outputs/badges/wolfi-base.build.status.latest-dev.svg)](images/wolfi-base/configs/latest.apko.yaml)<br/>[![](https://storage.googleapis.com/chainguard-images-build-outputs/badges/wolfi-base.build.status.latest.svg)](images/wolfi-base/configs/latest.apko.yaml) |
