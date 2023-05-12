@@ -256,10 +256,9 @@ runs:
         GH_TOKEN: "${{ github.token }}"
         GITHUB_CONTEXT: "${{ toJSON(github) }}" # Needed by slsa-generator-container
       run: |
-        set -x
-
         # Recover the provenance doc
-        echo "${{ inputs.slsaProvenanceBase64 }}" | base64 -d > provenance.json
+        echo ${{ inputs.slsaProvenanceBase64 }} | base64 -d > provenance.json
+        set -x
         echo "Provenance doc:"
         cat provenance.json | jq
 
