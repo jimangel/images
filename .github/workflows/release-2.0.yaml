@@ -87,12 +87,11 @@ jobs:
           chmod +x "${GENERATOR_RELEASE_BINARY}"
 
           # Create the provenance document
-          trap "rm -f provenance.json" EXIT
           echo "Generating SLSA build provenance ..."
           "./${GENERATOR_RELEASE_BINARY}" generate --predicate="provenance.json"
           echo "Provenance doc:"
           cat provenance.json | jq
-          echo "slsa-provenance-cache-key=slsa-$(git log -1 --format='%H')-$(date +%s)" >> $GITHUB_OUTPUT
+          echo "slsa-provenance-cache-key=slsa-${{ github.run_id }}-$(date +%s)" >> $GITHUB_OUTPUT
       - id: cache-slsa-provenance-doc
         name: Cache the SLSA Provenance doc to be used in matrix legs
         uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1

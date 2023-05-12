@@ -43,6 +43,7 @@ type ImageManifest struct {
 	Ref            string                 `yaml:"ref"`
 	Status         string                 `yaml:"status"`
 	ExcludeContact bool                   `yaml:"excludeContact"`
+	Terraform      bool                   `yaml:"terraform"`
 	Variants       []ImageManifestVariant `yaml:"versions"`
 }
 
