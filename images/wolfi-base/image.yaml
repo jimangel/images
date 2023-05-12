@@ -2,3 +2,5 @@ ref: ghcr.io/chainguard-images/testing/release-2.0/wolfi-base
 versions:
   - apko:
       config: configs/latest.apko.yaml
+      extractTagsFrom:
+        package: curl

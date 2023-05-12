@@ -7,6 +7,7 @@ contents:
     - ca-certificates-bundle
     - wolfi-base
     - wolfi-baselayout
+    - curl
 
 cmd: /bin/sh -l
 
