@@ -95,7 +95,7 @@ jobs:
 
           # Add base64 version of it to outputs
           set +x
-          echo "slsa-provenance-base64=$(cat provenance.json | base64)" >> $GITHUB_OUTPUT
+          echo "slsa-provenance-base64=$(cat provenance.json | base64 -w 0)" >> $GITHUB_OUTPUT
 
   build:
     runs-on: ubuntu-latest
