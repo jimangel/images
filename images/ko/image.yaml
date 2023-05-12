@@ -1,0 +1,7 @@
+terraform: true
+ref: ghcr.io/chainguard-images/testing/release-2.0/ko
+versions:
+  - apko:
+      config: configs/latest.apko.yaml
+      extractTagsFrom:
+        package: ko
