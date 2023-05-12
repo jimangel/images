@@ -58,7 +58,7 @@ jobs:
   generate-slsa-provenance:
     runs-on: ubuntu-latest
     outputs:
-      slsa-provenance-base64: ${{ steps.generate-slsa-provenance.outputs.slsa-provenance-cache-key }}
+      slsa-provenance-cache-key: ${{ steps.generate-slsa-provenance.outputs.slsa-provenance-cache-key }}
     permissions:
       id-token: write
       packages: write
