@@ -174,9 +174,11 @@ runs:
         TF_VAR_apko_config_path: ${{ inputs.apkoConfig }}
         TF_VAR_target_repository: ${{ inputs.apkoBaseTag }}
         TF_VAR_extract_package: ${{ inputs.apkoPackageVersionTag }}
+        TF_VAR_build_options: ${{ inputs.apkoBuildOptions }}
         DOCKER_CONFIG: .docker-rumble
       run: |
         set -x
+        env | grep '^TF_VAR_'
         terraform init
         terraform apply -auto-approve
 
@@ -240,26 +242,56 @@ runs:
         echo "Contents of apko.tags:"
         cat apko.tags
 
-    # # Build and push
-    # - id: apko
-    #   uses: chainguard-images/actions/apko-snapshot@main
-    #   with:
-    #     apko-image: ${{ inputs.apkoImage }}
-    #     config: ${{ inputs.apkoConfig }}
-    #     base-tag: ${{ inputs.apkoBaseTag }}
-    #     target-tag: ${{ inputs.apkoTargetTag }}
-    #     keyring-append: ${{ inputs.apkoKeyringAppend }}
-    #     repository-append: ${{ inputs.apkoRepositoryAppend }}
-    #     additional-tags: ${{ inputs.apkoAdditionalTags }}
-    #     package-version-tag: ${{ inputs.apkoPackageVersionTag }}
-    #     package-version-tag-stem: true
-    #     package-version-tag-prefix: ${{ inputs.apkoPackageVersionTagPrefix }}
-    #     stage_tags: apko.tags
-    #     build-options: ${{ inputs.apkoBuildOptions }}
-    #     sbom-attest: true
-    #     slsa-attest: true
-    #     generic-user: ${{ steps.cgrauth2.outputs.username }}
-    #     generic-pass: ${{ steps.cgrauth2.outputs.password }}
+    # SLSA attestation
+    # TODO: do it in terraform
+    # See https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/container
+    - name: 'SLSA: Generate provenance and attest'
+      shell: bash
+      env:
+        COSIGN_EXPERIMENTAL: "true"
+        GENERATOR_REPOSITORY: slsa-framework/slsa-github-generator
+        GENERATOR_RELEASE_TAG: v1.5.0
+        GENERATOR_RELEASE_BINARY: slsa-generator-container-linux-amd64
+        GENERATOR_RELEASE_BINARY_SHA256: 6d8b83327ac2134aa8760e1e4f9cd5d3fdbcb56599e39be2cd965f1e04aa8ede
+        GH_TOKEN: "${{ github.token }}"
+        GITHUB_CONTEXT: "${{ toJSON(github) }}" # Needed by slsa-generator-container
+      run: |
+        set -x
+        # Fetch the generator
+        gh release -R "${GENERATOR_REPOSITORY}" download "${GENERATOR_RELEASE_TAG}" -p "${GENERATOR_RELEASE_BINARY}"
+        COMPUTED_HASH="$(sha256sum "${GENERATOR_RELEASE_BINARY}" | awk '{print $1}')"
+        if [[ "${COMPUTED_HASH}" != "${GENERATOR_RELEASE_BINARY_SHA256}" ]]; then
+          echo "Mismatched checksums (wanted ${GENERATOR_RELEASE_BINARY_SHA256} got ${COMPUTED_HASH}). Exiting."
+          exit 1
+        fi
+        chmod +x "${GENERATOR_RELEASE_BINARY}"
+
+        # Create the provenance document
+        trap "rm -f provenance.json" EXIT
+        echo "Generating SLSA build provenance ..."
+        "./${GENERATOR_RELEASE_BINARY}" generate --predicate="provenance.json"
+        echo "Provenance doc:"
+        cat provenance.json | jq
+
+        function attest_slsa {
+          arch="${1}"
+          digest="${2}"
+          echo "Attaching SLSA build provenance to ${digest} (arch: ${arch}) ..."
+          cosign attest --yes --type slsaprovenance --predicate="provenance.json" "${digest}"
+        }
+
+        # First attest the index
+        attest_slsa "index" "${{ steps.extract.outputs.digest-index }}"
+
+        # Next, for each architecture (if present)
+        [[ "${{ steps.extract.outputs.digest-amd64 }}" == "" ]] || attest_slsa "amd64" "${{ steps.extract.outputs.digest-amd64 }}"
+        [[ "${{ steps.extract.outputs.digest-arm64 }}" == "" ]] || attest_slsa "arm64" "${{ steps.extract.outputs.digest-arm64 }}"
+        [[ "${{ steps.extract.outputs.digest-386 }}" == "" ]] || attest_slsa "386" "${{ steps.extract.outputs.digest-386 }}"
+        [[ "${{ steps.extract.outputs.digest-armv6 }}" == "" ]] || attest_slsa "armv6" "${{ steps.extract.outputs.digest-armv6 }}"
+        [[ "${{ steps.extract.outputs.digest-armv7 }}" == "" ]] || attest_slsa "armv7" "${{ steps.extract.outputs.digest-armv7 }}"
+        [[ "${{ steps.extract.outputs.digest-ppc64le }}" == "" ]] || attest_slsa "ppc64le" "${{ steps.extract.outputs.digest-ppc64le }}"
+        [[ "${{ steps.extract.outputs.digest-riscv64 }}" == "" ]] || attest_slsa "riscv64" "${{ steps.extract.outputs.digest-riscv64 }}"
+        [[ "${{ steps.extract.outputs.digest-s390x }}" == "" ]] || attest_slsa "s390x" "${{ steps.extract.outputs.digest-s390x }}"
 
     # Test image
     - name: Smoke test
