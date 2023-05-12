@@ -135,9 +135,8 @@ runs:
         yq -M '{"options": .}' tmp.yaml >> "${{ inputs.apkoConfig }}"
         rm -f tmp.yaml
 
-    # Needed in step below to login to registry
+    # Needed in step below to login to registry (if cgr.dev), and also for SLSA attestation
     - name: Setup cosign
-      if: contains(inputs.apkoBaseTag, 'cgr.dev/') && inputs.chainguardIdentity != ''
       uses: sigstore/cosign-installer@v3
 
     # Create docker config for use by rumble
@@ -281,17 +280,17 @@ runs:
         }
 
         # First attest the index
-        attest_slsa "index" "${{ steps.extract.outputs.digest-index }}"
+        attest_slsa "index" "${{ steps.apko.outputs.digest-index }}"
 
         # Next, for each architecture (if present)
-        [[ "${{ steps.extract.outputs.digest-amd64 }}" == "" ]] || attest_slsa "amd64" "${{ steps.extract.outputs.digest-amd64 }}"
-        [[ "${{ steps.extract.outputs.digest-arm64 }}" == "" ]] || attest_slsa "arm64" "${{ steps.extract.outputs.digest-arm64 }}"
-        [[ "${{ steps.extract.outputs.digest-386 }}" == "" ]] || attest_slsa "386" "${{ steps.extract.outputs.digest-386 }}"
-        [[ "${{ steps.extract.outputs.digest-armv6 }}" == "" ]] || attest_slsa "armv6" "${{ steps.extract.outputs.digest-armv6 }}"
-        [[ "${{ steps.extract.outputs.digest-armv7 }}" == "" ]] || attest_slsa "armv7" "${{ steps.extract.outputs.digest-armv7 }}"
-        [[ "${{ steps.extract.outputs.digest-ppc64le }}" == "" ]] || attest_slsa "ppc64le" "${{ steps.extract.outputs.digest-ppc64le }}"
-        [[ "${{ steps.extract.outputs.digest-riscv64 }}" == "" ]] || attest_slsa "riscv64" "${{ steps.extract.outputs.digest-riscv64 }}"
-        [[ "${{ steps.extract.outputs.digest-s390x }}" == "" ]] || attest_slsa "s390x" "${{ steps.extract.outputs.digest-s390x }}"
+        [[ "${{ steps.apko.outputs.digest-amd64 }}" == "" ]] || attest_slsa "amd64" "${{ steps.apko.outputs.digest-amd64 }}"
+        [[ "${{ steps.apko.outputs.digest-arm64 }}" == "" ]] || attest_slsa "arm64" "${{ steps.apko.outputs.digest-arm64 }}"
+        [[ "${{ steps.apko.outputs.digest-386 }}" == "" ]] || attest_slsa "386" "${{ steps.apko.outputs.digest-386 }}"
+        [[ "${{ steps.apko.outputs.digest-armv6 }}" == "" ]] || attest_slsa "armv6" "${{ steps.apko.outputs.digest-armv6 }}"
+        [[ "${{ steps.apko.outputs.digest-armv7 }}" == "" ]] || attest_slsa "armv7" "${{ steps.apko.outputs.digest-armv7 }}"
+        [[ "${{ steps.apko.outputs.digest-ppc64le }}" == "" ]] || attest_slsa "ppc64le" "${{ steps.apko.outputs.digest-ppc64le }}"
+        [[ "${{ steps.apko.outputs.digest-riscv64 }}" == "" ]] || attest_slsa "riscv64" "${{ steps.apko.outputs.digest-riscv64 }}"
+        [[ "${{ steps.apko.outputs.digest-s390x }}" == "" ]] || attest_slsa "s390x" "${{ steps.apko.outputs.digest-s390x }}"
 
     # Test image
     - name: Smoke test
