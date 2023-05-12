@@ -245,6 +245,7 @@ runs:
     # TODO: do it in terraform
     # See https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/container
     - name: 'SLSA: Generate provenance and attest'
+      if: inputs.slsaProvenanceBase64 != ''
       shell: bash
       env:
         COSIGN_EXPERIMENTAL: "true"
@@ -256,19 +257,9 @@ runs:
         GITHUB_CONTEXT: "${{ toJSON(github) }}" # Needed by slsa-generator-container
       run: |
         set -x
-        # Fetch the generator
-        gh release -R "${GENERATOR_REPOSITORY}" download "${GENERATOR_RELEASE_TAG}" -p "${GENERATOR_RELEASE_BINARY}"
-        COMPUTED_HASH="$(sha256sum "${GENERATOR_RELEASE_BINARY}" | awk '{print $1}')"
-        if [[ "${COMPUTED_HASH}" != "${GENERATOR_RELEASE_BINARY_SHA256}" ]]; then
-          echo "Mismatched checksums (wanted ${GENERATOR_RELEASE_BINARY_SHA256} got ${COMPUTED_HASH}). Exiting."
-          exit 1
-        fi
-        chmod +x "${GENERATOR_RELEASE_BINARY}"
 
-        # Create the provenance document
-        trap "rm -f provenance.json" EXIT
-        echo "Generating SLSA build provenance ..."
-        "./${GENERATOR_RELEASE_BINARY}" generate --predicate="provenance.json"
+        # Recover the provenance doc
+        echo "${{ inputs.slsaProvenanceBase64 }}" | base64 -d > provenance.json
         echo "Provenance doc:"
         cat provenance.json | jq
 
