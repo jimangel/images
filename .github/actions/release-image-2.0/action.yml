@@ -155,6 +155,8 @@ runs:
             docker login -u "${{ github.repository_owner }}" --password-stdin "https://ghcr.io"
         fi
 
+    - uses: imjasonh/setup-crane@v0.3
+
     - name: Setup Terrafrom
       id: setup-terraform
       uses: hashicorp/setup-terraform@v2
@@ -173,11 +175,34 @@ runs:
         set -x
         terraform init
         terraform apply -auto-approve
-        tree || true
-        ls -lath || true
-        digest_index="$(terraform output --raw image_ref)"
-        echo "index digest: ${digest_index}"
-        echo "digest-index=${digest_index}" >> $GITHUB_OUTPUT
+
+        # Extra stuff related to output etc. used in remainder of pipeline
+        digest="$(terraform output --raw image_ref)"
+        output="digest-index=${digest}"
+        echo "Adding GitHub step output: ${output}"
+        echo "${output}" >> $GITHUB_OUTPUT
+        output="shortdigest-index=$(echo "${digest}" | cut -d@ -f 2)"
+        echo "Adding GitHub step output: ${output}"
+        echo "${output}" >> $GITHUB_OUTPUT
+
+        # If its an index, extract the platform digests too
+        CRANE_MANIFEST_OUTPUT="$(crane manifest ${digest})"
+        if [[ "$(echo $CRANE_MANIFEST_OUTPUT | jq -r .mediaType)" == "application/vnd.oci.image.index.v1+json" ]]; then
+          for combo in `echo $CRANE_MANIFEST_OUTPUT | jq -r '.manifests[] | .platform.architecture + .platform.variant + "_" + .digest'`; do
+            arch="$(echo "${combo}" | cut -d "_" -f1)"
+            digest="$(echo "${combo}" | cut -d "_" -f2)"
+            output="digest-${arch}=${{ inputs.apkoBaseTag }}@${digest}"
+            echo "Adding GitHub step output: ${output}"
+            echo "${output}" >> $GITHUB_OUTPUT
+            output="shortdigest-${arch}=${digest}"
+            echo "Adding GitHub step output: ${output}"
+            echo "${output}" >> $GITHUB_OUTPUT
+          done
+        fi
+
+        # TODO: add more tags based on package extract here
+        echo "${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}" > apko.tags
+        echo "${{ inputs.apkoBaseTag }}:${{ inputs.apkoTargetTag }}-$(date -u +%Y%m%d)" > apko.tags
 
     # # Build and push
     # - id: apko
@@ -220,12 +245,12 @@ runs:
         image: ${{ steps.apko.outputs.digest-index }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-index-grype
-      with:
-        image: ${{ steps.apko.outputs.digest-index }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-index-grype
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-index }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-amd64-trivy
       if: steps.apko.outputs.digest-amd64 != ''
@@ -233,13 +258,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-amd64 }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-amd64-grype
-      if: steps.apko.outputs.digest-amd64 != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-amd64 }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-amd64-grype
+    #   if: steps.apko.outputs.digest-amd64 != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-amd64 }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-arm64-trivy
       if: steps.apko.outputs.digest-arm64 != ''
@@ -247,13 +272,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-arm64 }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-arm64-grype
-      if: steps.apko.outputs.digest-arm64 != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-arm64 }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-arm64-grype
+    #   if: steps.apko.outputs.digest-arm64 != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-arm64 }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-386-trivy
       if: steps.apko.outputs.digest-386 != ''
@@ -261,13 +286,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-386 }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-386-grype
-      if: steps.apko.outputs.digest-386 != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-386 }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-386-grype
+    #   if: steps.apko.outputs.digest-386 != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-386 }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-armv6-trivy
       if: steps.apko.outputs.digest-armv6 != ''
@@ -275,13 +300,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-armv6 }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-armv6-grype
-      if: steps.apko.outputs.digest-armv6 != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-armv6 }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-armv6-grype
+    #   if: steps.apko.outputs.digest-armv6 != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-armv6 }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-armv7-trivy
       if: steps.apko.outputs.digest-armv7 != ''
@@ -289,13 +314,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-armv7 }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-armv7-grype
-      if: steps.apko.outputs.digest-armv7 != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-armv7 }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-armv7-grype
+    #   if: steps.apko.outputs.digest-armv7 != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-armv7 }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-ppc64le-trivy
       if: steps.apko.outputs.digest-ppc64le != ''
@@ -303,13 +328,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-ppc64le }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-ppc64le-grype
-      if: steps.apko.outputs.digest-ppc64le != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-ppc64le }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-ppc64le-grype
+    #   if: steps.apko.outputs.digest-ppc64le != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-ppc64le }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-riscv64-trivy
       if: steps.apko.outputs.digest-riscv64 != ''
@@ -317,13 +342,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-riscv64 }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-riscv64-grype
-      if: steps.apko.outputs.digest-riscv64 != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-riscv64 }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-riscv64-grype
+    #   if: steps.apko.outputs.digest-riscv64 != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-riscv64 }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
     - uses: chainguard-dev/rumble@main
       id: scan-s390x-trivy
       if: steps.apko.outputs.digest-s390x != ''
@@ -331,13 +356,13 @@ runs:
         image: ${{ steps.apko.outputs.digest-s390x }}
         scanner: trivy
         docker-config: .docker-rumble
-    - uses: chainguard-dev/rumble@main
-      id: scan-s390x-grype
-      if: steps.apko.outputs.digest-s390x != ''
-      with:
-        image: ${{ steps.apko.outputs.digest-s390x }}
-        scanner: grype
-        docker-config: .docker-rumble
+    # - uses: chainguard-dev/rumble@main
+    #   id: scan-s390x-grype
+    #   if: steps.apko.outputs.digest-s390x != ''
+    #   with:
+    #     image: ${{ steps.apko.outputs.digest-s390x }}
+    #     scanner: grype
+    #     docker-config: .docker-rumble
 
     # Tag the image last, after all tests passing and
     # SBOMs, attestations, etc. have all been attached
