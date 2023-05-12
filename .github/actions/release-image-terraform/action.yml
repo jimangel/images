@@ -1,4 +1,4 @@
-name: release-image-2.0
+name: release-image-terraform
 inputs:
   slackWebhookUrl:
     default: ''
