@@ -244,8 +244,14 @@ runs:
     # SLSA attestation
     # TODO: do it in terraform
     # See https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/container
+    - name: Fetch SLSA provenance.json from cache
+      if: inputs.slsaProvenanceCacheKey != ''
+      uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
+      with:
+        path: ./provenance.json
+        key: ${{ inputs.slsaProvenanceCacheKey }}
     - name: 'SLSA: Generate provenance and attest'
-      if: inputs.slsaProvenanceBase64 != ''
+      if: inputs.slsaProvenanceCacheKey != ''
       shell: bash
       env:
         COSIGN_EXPERIMENTAL: "true"
@@ -256,8 +262,6 @@ runs:
         GH_TOKEN: "${{ github.token }}"
         GITHUB_CONTEXT: "${{ toJSON(github) }}" # Needed by slsa-generator-container
       run: |
-        # Recover the provenance doc
-        echo ${{ inputs.slsaProvenanceBase64 }} | base64 -d > provenance.json
         set -x
         echo "Provenance doc:"
         cat provenance.json | jq

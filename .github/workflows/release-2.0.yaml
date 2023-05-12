@@ -58,7 +58,7 @@ jobs:
   generate-slsa-provenance:
     runs-on: ubuntu-latest
     outputs:
-      slsa-provenance-base64: ${{ steps.generate-slsa-provenance.outputs.slsa-provenance-base64 }}
+      slsa-provenance-base64: ${{ steps.generate-slsa-provenance.outputs.slsa-provenance-cache-key }}
     permissions:
       id-token: write
       packages: write
@@ -92,10 +92,13 @@ jobs:
           "./${GENERATOR_RELEASE_BINARY}" generate --predicate="provenance.json"
           echo "Provenance doc:"
           cat provenance.json | jq
-
-          # Add base64 version of it to outputs
-          set +x
-          echo "slsa-provenance-base64=$(cat provenance.json | base64 -w 0)" >> $GITHUB_OUTPUT
+          echo "slsa-provenance-cache-key=slsa-$(git log -1 --format='%H')-$(date +%s)" >> $GITHUB_OUTPUT
+      - id: cache-slsa-provenance-doc
+        name: Cache the SLSA Provenance doc to be used in matrix legs
+        uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
+        with:
+          path: ./provenance.json
+          key: "${{ steps.generate-slsa-provenance.outputs.slsa-provenance-cache-key }}"
 
   build:
     runs-on: ubuntu-latest
@@ -123,7 +126,7 @@ jobs:
         #   # https://github.com/chainguard-dev/mono/blob/main/env/chainguard-images/iac/images-pusher.tf
         #   EXTRA_INPUT_CHAINGUARD_IDENTITY: 720909c9f5279097d847ad02a2f24ba8f59de36a/b6461e99e132298f
           EXTRA_INPUT_APKO_IMAGE: ghcr.io/wolfi-dev/apko:latest@sha256:d0d35729ac785d5bc15d50a1d99ea9a2aef565779fadf37235edfc9b30a10e75
-          EXTRA_INPUT_SLSA_PROVENANCE_BASE64: ${{ needs.generate-slsa-provenance.outputs.slsa-provenance-base64 }}
+          EXTRA_INPUT_SLSA_PROVENANCE_CACHE_KEY: ${{ needs.generate-slsa-provenance.outputs.slsa-provenance-cache-key }}
         run: |
           # convert env vars beginning with "EXTRA_INPUT_"
           # to camelcased input variables passed to next step
