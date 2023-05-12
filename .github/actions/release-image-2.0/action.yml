@@ -170,11 +170,15 @@ runs:
       env:
         TF_VAR_apko_config_path: ${{ inputs.apkoConfig }}
         TF_VAR_target_repository: ${{ inputs.apkoBaseTag }}
+        TF_VAR_extract_package: wolfi-base
         DOCKER_CONFIG: .docker-rumble
       run: |
         set -x
         terraform init
         terraform apply -auto-approve
+        
+        package_version="$(terraform output --raw package_version)"
+        echo "Package version: ${package_version}"
 
         # Extra stuff related to output etc. used in remainder of pipeline
         digest="$(terraform output --raw image_ref)"
